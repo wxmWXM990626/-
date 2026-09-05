@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 语音朗读台 · 多角色对话</title>
+<style>
+  :root{
+    --bg1:#0d0e20; --bg2:#191a3a; --bg3:#241a44;
+    --card:rgba(255,255,255,.06); --card2:rgba(255,255,255,.10);
+    --line:rgba(255,255,255,.12);
+    --txt:#eceefb; --dim:#a3a7c9; --dim2:#757a9e;
+    --pri:#7c5cff; --pri2:#a78bfa; --pink:#ff6b9d; --cyan:#4dd6f7; --ok:#3ddc97;
+    --shadow:0 12px 40px rgba(0,0,0,.38);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Segoe UI",system-ui,sans-serif;
+    color:var(--txt); min-height:100vh; line-height:1.6;
+    background:
+      radial-gradient(1200px 700px at 12% -8%, rgba(124,92,255,.35), transparent 60%),
+      radial-gradient(900px 600px at 92% 4%, rgba(255,107,157,.26), transparent 60%),
+      radial-gradient(800px 700px at 50% 110%, rgba(77,214,247,.16), transparent 60%),
+      linear-gradient(160deg,var(--bg1),var(--bg2) 55%,var(--bg3));
+    background-attachment:fixed;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 20px 70px}
+
+  /* ---------- header ---------- */
+  header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:26px;
+    background:linear-gradient(135deg,var(--pri),var(--pink));box-shadow:0 10px 26px rgba(124,92,255,.45)}
+  .brand h1{margin:0;font-size:24px;letter-spacing:.5px}
+  .brand p{margin:2px 0 0;font-size:13px;color:var(--dim)}
+
+  .engine{display:flex;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
+  .engine button{border:0;background:transparent;color:var(--dim);padding:9px 16px;border-radius:11px;cursor:pointer;
+    font-size:13.5px;font-weight:600;font-family:inherit;transition:.2s;display:flex;align-items:center;gap:6px}
+  .engine button.on{background:linear-gradient(135deg,var(--pri),#9b6bff);color:#fff;box-shadow:0 6px 18px rgba(124,92,255,.4)}
+  .engine small{display:block;font-size:11px;font-weight:400;opacity:.75}
+
+  /* ---------- generic card ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;
+    backdrop-filter:blur(14px);box-shadow:var(--shadow);margin-bottom:18px}
+  .card h2{margin:0 0 14px;font-size:16px;display:flex;align-items:center;gap:9px}
+  .card h2 .tag{font-size:11px;font-weight:500;color:var(--dim);background:rgba(0,0,0,.25);
+    border:1px solid var(--line);padding:3px 9px;border-radius:20px}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tabs button{flex:1;min-width:150px;border:1px solid var(--line);background:var(--card);color:var(--dim);
+    padding:14px 18px;border-radius:16px;cursor:pointer;font-size:15px;font-weight:600;font-family:inherit;
+    transition:.22s;display:flex;align-items:center;justify-content:center;gap:9px}
+  .tabs button:hover{background:var(--card2);color:var(--txt)}
+  .tabs button.on{background:linear-gradient(135deg,rgba(124,92,255,.9),rgba(255,107,157,.75));
+    color:#fff;border-color:transparent;box-shadow:0 10px 26px rgba(124,92,255,.35)}
+
+  /* ---------- voice picker ---------- */
+  .vsel{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border-radius:16px;cursor:pointer;
+    background:rgba(0,0,0,.24);border:1px dashed var(--line);transition:.2s;text-align:left;color:var(--txt);font-family:inherit}
+  .vsel:hover{border-color:var(--pri2);background:rgba(124,92,255,.12)}
+  .vavatar{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:23px;flex:0 0 auto;
+    background:linear-gradient(135deg,rgba(124,92,255,.5),rgba(255,107,157,.45))}
+  .vsel .vmeta{flex:1;min-width:0}
+  .vsel .vname{font-size:15px;font-weight:600}
+  .vsel .vdesc{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vsel .vchange{font-size:12px;color:var(--pri2);flex:0 0 auto}
+
+  .modal{position:fixed;inset:0;background:rgba(6,7,18,.72);backdrop-filter:blur(8px);z-index:80;
+    display:none;align-items:center;justify-content:center;padding:22px}
+  .modal.show{display:flex}
+  .modal-box{width:min(940px,100%);max-height:86vh;overflow:auto;background:linear-gradient(160deg,#1c1d3d,#241a44);
+    border:1px solid var(--line);border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.55);padding:24px}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;position:sticky;top:-24px;
+    background:linear-gradient(160deg,#1c1d3d,#201c40);padding:6px 0 12px;z-index:2}
+  .modal-head h3{margin:0;font-size:18px}
+  .x-close{border:0;background:rgba(255,255,255,.08);color:var(--txt);width:34px;height:34px;border-radius:11px;
+    cursor:pointer;font-size:17px;line-height:1}
+  .search{width:100%;margin:10px 0 16px;padding:12px 15px;border-radius:13px;border:1px solid var(--line);
+    background:rgba(0,0,0,.3);color:var(--txt);font-size:14px;font-family:inherit;outline:none}
+  .search:focus{border-color:var(--pri2)}
+  .grp-title{font-size:12.5px;color:var(--dim);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+  .grp-title::after{content:"";flex:1;height:1px;background:var(--line)}
+  .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:11px}
+  .vcard{position:relative;padding:14px;border-radius:16px;cursor:pointer;border:1px solid var(--line);
+    background:rgba(255,255,255,.045);transition:.18s}
+  .vcard:hover{transform:translateY(-3px);border-color:var(--pri2);background:rgba(124,92,255,.14)}
+  .vcard.on{border-color:var(--pri);background:linear-gradient(135deg,rgba(124,92,255,.3),rgba(255,107,157,.18));
+    box-shadow:0 8px 24px rgba(124,92,255,.3)}
+  .vcard .top{display:flex;align-items:center;gap:11px}
+  .vcard .emo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:21px;
+    background:rgba(255,255,255,.08)}
+  .vcard .nm{font-size:14.5px;font-weight:600}
+  .vcard .ds{font-size:11.5px;color:var(--dim)}
+  .vcard .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .chip{font-size:10.5px;padding:2.5px 8px;border-radius:20px;background:rgba(255,255,255,.09);color:var(--dim)}
+  .chip.g{background:rgba(61,220,151,.16);color:#7ff0c0}
+  .chip.p{background:rgba(255,107,157,.18);color:#ffa8c6}
+  .chip.b{background:rgba(77,214,247,.16);color:#9ae6ff}
+  .chip.y{background:rgba(255,193,84,.16);color:#ffd79a}
+  .try{position:absolute;top:11px;right:11px;width:30px;height:30px;border-radius:9px;border:0;cursor:pointer;
+    background:rgba(0,0,0,.34);color:var(--dim);font-size:13px;display:grid;place-items:center}
+  .try:hover{background:var(--pri);color:#fff}
+
+  /* ---------- sliders ---------- */
+  .knobs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-top:16px}
+  .knob label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dim);margin-bottom:7px}
+  .knob label b{color:var(--pri2);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:5px;outline:none;
+    background:linear-gradient(90deg,var(--pri),var(--pink));cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+    background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.45);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border:0;border-radius:50%;background:#fff}
+
+  /* ---------- textarea ---------- */
+  textarea{width:100%;min-height:172px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);
+    background:rgba(0,0,0,.3);color:var(--txt);font-size:15.5px;line-height:1.85;font-family:inherit;
+    resize:vertical;outline:none;transition:.2s}
+  textarea:focus{border-color:var(--pri2);box-shadow:0 0 0 4px rgba(124,92,255,.14)}
+  textarea::placeholder{color:var(--dim2)}
+  .quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .quick button{border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--dim);
+    padding:7px 13px;border-radius:20px;font-size:12.5px;cursor:pointer;font-family:inherit;transition:.18s}
+  .quick button:hover{background:var(--pri);color:#fff;border-color:transparent}
+
+  /* ---------- buttons ---------- */
+  .acts{display:flex;flex-wrap:wrap;gap:11px;margin-top:18px}
+  .btn{border:0;padding:13px 24px;border-radius:14px;font-size:14.5px;font-weight:600;cursor:pointer;
+    font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:.2s}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-p{background:linear-gradient(135deg,var(--pri),#9d6bff);color:#fff;box-shadow:0 8px 22px rgba(124,92,255,.38)}
+  .btn-p:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 28px rgba(124,92,255,.5)}
+  .btn-g{background:rgba(255,255,255,.08);color:var(--txt);border:1px solid var(--line)}
+  .btn-g:hover:not(:disabled){background:rgba(255,255,255,.15)}
+  .btn-d{background:rgba(255,107,157,.16);color:#ffa8c6;border:1px solid rgba(255,107,157,.3)}
+  .btn-d:hover:not(:disabled){background:rgba(255,107,157,.28)}
+  .btn-sm{padding:8px 14px;font-size:12.5px;border-radius:11px}
+
+  /* ---------- status ---------- */
+  .status{margin-top:16px;padding:13px 16px;border-radius:14px;font-size:13px;display:none;align-items:center;gap:10px}
+  .status.show{display:flex}
+  .status.info{background:rgba(77,214,247,.12);border:1px solid rgba(77,214,247,.28);color:#9ae6ff}
+  .status.ok{background:rgba(61,220,151,.12);border:1px solid rgba(61,220,151,.28);color:#7ff0c0}
+  .status.err{background:rgba(255,107,157,.12);border:1px solid rgba(255,107,157,.3);color:#ffa8c6}
+  .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:0 0 auto;animation:pulse 1.3s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+
+  /* ---------- dialogue ---------- */
+  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+  .role{border:1px solid var(--line);border-radius:18px;padding:18px;background:rgba(0,0,0,.2);position:relative;overflow:hidden}
+  .role::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .role.a::before{background:linear-gradient(180deg,var(--pri),var(--cyan))}
+  .role.b::before{background:linear-gradient(180deg,var(--pink),#ffb86b)}
+  .role-h{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .role-h .em{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px;background:rgba(255,255,255,.08)}
+  .role-h input{background:transparent;border:0;color:var(--txt);font-size:15px;font-weight:700;font-family:inherit;
+    outline:none;border-bottom:1px dashed transparent;min-width:0;flex:1}
+  .role-h input:hover{border-bottom-color:var(--line)}
+
+  .lines{display:flex;flex-direction:column;gap:10px;max-height:430px;overflow:auto;padding-right:6px}
+  .lines::-webkit-scrollbar{width:7px}
+  .lines::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:5px}
+  .line{display:flex;gap:11px;padding:13px 15px;border-radius:15px;background:rgba(255,255,255,.04);
+    border:1px solid transparent;transition:.2s;animation:pop .25s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .line.speaking{border-color:var(--pri);background:linear-gradient(135deg,rgba(124,92,255,.22),rgba(255,107,157,.12));
+    box-shadow:0 6px 20px rgba(124,92,255,.25)}
+  .line .who{flex:0 0 auto;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;
+    background:rgba(255,255,255,.07)}
+  .line .body{flex:1;min-width:0}
+  .line .body .n{font-size:11.5px;color:var(--dim);margin-bottom:3px}
+  .line .body .t{font-size:14.5px;word-break:break-word;white-space:pre-wrap}
+  .line .ops{display:flex;gap:5px;flex:0 0 auto;opacity:.4;transition:.2s}
+  .line:hover .ops{opacity:1}
+  .icb{border:0;background:rgba(255,255,255,.07);color:var(--dim);width:29px;height:29px;border-radius:9px;
+    cursor:pointer;font-size:12.5px;display:grid;place-items:center;transition:.16s;padding:0}
+  .icb:hover{background:var(--pri);color:#fff}
+  .icb.del:hover{background:var(--pink);color:#fff}
+  .empty{text-align:center;padding:44px 20px;color:var(--dim2);font-size:13.5px}
+  .empty .big{font-size:40px;display:block;margin-bottom:10px;opacity:.5}
+
+  .composer{display:flex;gap:11px;align-items:flex-start;margin-top:16px}
+  .composer textarea{min-height:64px;font-size:14.5px;border-radius:14px;padding:13px 15px}
+  .seg{display:flex;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex:0 0 auto}
+  .seg button{border:0;background:transparent;color:var(--dim);padding:9px 14px;border-radius:9px;cursor:pointer;
+    font-size:13px;font-weight:600;font-family:inherit}
+  .seg button.on{background:var(--pri);color:#fff}
+
+  .foot{text-align:center;color:var(--dim2);font-size:12px;margin-top:34px;line-height:1.9}
+  .foot code{background:rgba(0,0,0,.3);padding:2px 7px;border-radius:6px;color:var(--pri2)}
+
+  @media (max-width:640px){
+    .wrap{padding:18px 13px 50px}
+    .brand h1{font-size:19px}
+    .logo{width:44px;height:44px;font-size:21px}
+    .tabs button{min-width:0;font-size:13.5px;padding:12px}
+    .vgrid{grid-template-columns:1fr 1fr}
+    .card{padding:16px;border-radius:17px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">🎙️</div>
+      <div>
+        <h1>AI 语音朗读台</h1>
+        <p>文字转语音 · 多角色对话 · 萝莉/少女/御姐/正太/大叔自由切换</p>
+      </div>
+    </div>
+    <div class="engine" id="engineSwitch">
+      <button data-eng="local" class="on">🔌 本地引擎<small>离线可用·秒出声</small></button>
+      <button data-eng="cloud">☁️ 云端音色<small>音质更好·需联网</small></button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button data-tab="solo" class="on">📝 单人朗读</button>
+    <button data-tab="chat">💬 角色对话（互相交流）</button>
+  </div>
+
+  <!-- ======================= 单人朗读 ======================= -->
+  <section id="tab-solo">
+    <div class="card">
+      <h2>🎭 选择音色 <span class="tag" id="engTag">本地引擎</span></h2>
+      <button class="vsel" id="soloVoiceBtn">
+        <div class="vavatar" id="soloEmo">👧</div>
+        <div class="vmeta">
+          <div class="vname" id="soloName">少女音 · 甜美</div>
+          <div class="vdesc" id="soloDesc">正在加载音色…</div>
+        </div>
+        <div class="vchange">点击更换 ›</div>
+      </button>
+
+      <div class="knobs">
+        <div class="knob"><label>语速 <b id="soloRateV">1.00×</b></label>
+          <input type="range" id="soloRate" min="0.3" max="2.5" step="0.05" value="1"></div>
+        <div class="knob"><label>音调 <b id="soloPitchV">1.00×</b></label>
+          <input type="range" id="soloPitch" min="0.3" max="2.2" step="0.05" value="1"></div>
+        <div class="knob"><label>音量 <b id="soloVolV">100%</b></label>
+          <input type="range" id="soloVol" min="0" max="1" step="0.05" value="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ 输入要朗读的文字 <span class="tag" id="soloCount">0 字</span></h2>
+      <textarea id="soloText" placeholder="在这里输入你想让 TA 说的话……&#10;&#10;例如：&#10;你好呀，很高兴认识你～今天过得怎么样？&#10;我会用你选的声音，把这句话读出来。"></textarea>
+      <div class="quick" id="soloQuick">
+        <button>你好呀，很高兴认识你～</button>
+        <button>今天也要开开心心的哦！</button>
+        <button>晚安，做个好梦，明天见。</button>
+        <button>你好，请问有什么可以帮您？</button>
+        <button>欢迎光临，这边请～</button>
+      </div>
+
+      <div class="acts">
+        <button class="btn btn-p" id="soloPlay">▶️ 开始朗读</button>
+        <button class="btn btn-g" id="soloPause">⏸️ 暂停</button>
+        <button class="btn btn-g" id="soloStop">⏹️ 停止</button>
+        <button class="btn btn-d" id="soloDownload" disabled title="仅在「云端音色」引擎下可下载 MP3">⬇️ 下载 MP3</button>
+        <button class="btn btn-g" id="soloClear">🗑️ 清空</button>
+      </div>
+      <div class="status" id="soloStatus"><span class="dot"></span><span id="soloStatusTxt"></span></div>
+    </div>
+  </section>
+
+  <!-- ======================= 角色对话 ======================= -->
+  <section id="tab-chat" style="display:none">
+    <div class="card">
+      <h2>👥 两个角色的音色配置</h2>
+      <div class="roles">
+        <div class="role a">
+          <div class="role-h">
+            <div class="em" id="roleAEmo">👧</div>
+            <input id="roleAName" value="小萝莉">
+            <button class="btn btn-g btn-sm" data-role="A">换音色</button>
+          </div>
+          <div class="vdesc" id="roleADesc" style="font-size:12px;color:var(--dim);margin-bottom:12px">—</div>
+          <div class="knobs" style="margin-top:0">
+            <div class="knob"><label>语速 <b id="aRateV">1.00×</b></label>
+              <input type="range" id="aRate" min="0.3" max="2.5" step="0.05" value="1.05"></div>
+            <div class="knob"><label>音调 <b id="aPitchV">1.00×</b></label>
+              <input type="range" id="aPitch" min="0.3" max="2.4" step="0.05" value="1.5"></div>
+          </div>
+        </div>
+        <div class="role b">
+          <div class="role-h">
+            <div class="em" id="roleBEmo">🧑</div>
+            <input id="roleBName" value="大哥哥">
+            <button class="btn btn-g btn-sm" data-role="B">换音色</button>
+          </div>
+          <div class="vdesc" id="roleBDesc" style="font-size:12px;color:var(--dim);margin-bottom:12px">—</div>
+          <div class="knobs" style="margin-top:0">
+            <div class="knob"><label>语速 <b id="bRateV">1.00×</b></label>
+              <input type="range" id="bRate" min="0.3" max="2.5" step="0.05" value="1"></div>
+            <div class="knob"><label>音调 <b id="bPitchV">1.00×</b></label>
+              <input type="range" id="bPitch" min="0.3" max="2.4" step="0.05" value="0.9"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💬 对话内容 <span class="tag" id="lineCount">0 句</span></h2>
+      <div class="lines" id="lines"></div>
+
+      <div class="composer">
+        <div class="seg" id="whoSeg">
+          <button data-who="A" class="on">说这句话的是：角色 A</button>
+          <button data-who="B">角色 B</button>
+        </div>
+        <textarea id="lineText" placeholder="输入一句台词，回车发送…"></textarea>
+        <button class="btn btn-p" id="addLine">➕ 添加</button>
+      </div>
+
+      <div class="acts">
+        <button class="btn btn-p" id="playAll">🎬 播放整段对话</button>
+        <button class="btn btn-g" id="chatPause">⏸️ 暂停</button>
+        <button class="btn btn-g" id="chatStop">⏹️ 停止</button>
+        <button class="btn btn-d" id="chatDownload" disabled title="仅在「云端音色」引擎下可下载 MP3">⬇️ 下载整段 MP3</button>
+        <button class="btn btn-g" id="exportTxt">📄 导出文本</button>
+        <button class="btn btn-g" id="clearLines">🗑️ 清空对话</button>
+      </div>
+      <div class="status" id="chatStatus"><span class="dot"></span><span id="chatStatusTxt"></span></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    本地引擎调用浏览器内置语音（离线、零延迟），音色数量取决于你的系统；<br>
+    云端引擎使用微软 Edge 同款的神经网络音色（更自然、可选音色多），需要联网，若失败会自动提示。<br>
+    所有内容只在本机运行，不会上传到任何服务器（云端模式下仅把文字发给语音合成接口）。
+  </div>
+</div>
+
+<!-- ======================= 音色选择弹窗 ======================= -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>🎭 音色库 <span style="font-size:12px;color:var(--dim);font-weight:400" id="modalHint"></span></h3>
+      <button class="x-close" id="modalClose">✕</button>
+    </div>
+    <input class="search" id="vsearch" placeholder="🔍 搜索：萝莉 / 少女 / 御姐 / 正太 / 大叔 / 东北 / 台湾 …">
+    <div id="vgroups"></div>
+  </div>
+</div>
+
+<audio id="player" style="display:none"></audio>
+
+<script>
+/* =======================================================================
+   0. 全局状态
+   ======================================================================= */
+const state = {
+  engine: 'local',            // local | cloud
+  tab: 'solo',
+  localVoices: [],
+  cloudOK: null,              // null=未测试 true/false
+  solo: { voice: null, rate: 1, pitch: 1, vol: 1 },
+  A: { voice: null, rate: 1.05, pitch: 1.5, name: '小萝莉' },
+  B: { voice: null, rate: 1, pitch: 0.9, name: '大哥哥' },
+  mem: { local: { solo:null, A:null, B:null }, cloud: { solo:null, A:null, B:null } },
+  lines: [],                  // {id, who, text}
+  who: 'A',
+  playing: null,              // 当前播放控制器
+  lastAudio: null,            // 最近一次合成的音频 blob（供下载）
+};
+
+const LS = 'tts_studio_v1';
+
+/* =======================================================================
+   1. 音色定义
+   ======================================================================= */
+
+/* ---- 本地引擎预设：靠 系统音色匹配 + pitch/rate 模拟不同年龄性别 ---- */
+const LOCAL_PRESETS = [
+  { id:'lo',  name:'萝莉音',   emo:'🎀', desc:'软萌小妹妹，音调拉满',      gender:'f', rate:1.12, pitch:1.85, tags:['萝莉','萌','童声'] },
+  { id:'gi',  name:'少女音',   emo:'👧', desc:'甜美活泼的校园少女',        gender:'f', rate:1.05, pitch:1.42, tags:['少女','甜美','可爱'] },
+  { id:'wo',  name:'青年女声', emo:'👩', desc:'干净自然的年轻女声',        gender:'f', rate:1.00, pitch:1.10, tags:['女声','自然','温柔'] },
+  { id:'qu',  name:'御姐音',   emo:'💃', desc:'成熟知性，略带气场',        gender:'f', rate:0.94, pitch:0.88, tags:['御姐','成熟','磁性'] },
+  { id:'sh',  name:'正太音',   emo:'🧒', desc:'清脆小男孩',                gender:'m', rate:1.10, pitch:1.65, tags:['正太','男孩','少年感'] },
+  { id:'bo',  name:'少年音',   emo:'🧑', desc:'清爽干净的男高中生',        gender:'m', rate:1.02, pitch:1.22, tags:['少年','阳光','清爽'] },
+  { id:'ma',  name:'青年男声', emo:'👨', desc:'标准普通话男声',            gender:'m', rate:1.00, pitch:1.00, tags:['男声','标准','播报'] },
+  { id:'un',  name:'大叔音',   emo:'🧔', desc:'低沉磁性，稳重沧桑',        gender:'m', rate:0.92, pitch:0.72, tags:['大叔','低沉','磁性'] },
+  { id:'el',  name:'老爷爷',   emo:'👴', desc:'慢悠悠的老人声',            gender:'m', rate:0.82, pitch:0.70, tags:['老人','慢','厚重'] },
+  { id:'ro',  name:'机器人',   emo:'🤖', desc:'机械感电子音',              gender:'a', rate:0.95, pitch:0.50, tags:['机器人','电子','搞怪'] },
+  { id:'na',  name:'播音腔',   emo:'📻', desc:'新闻联播式标准腔',          gender:'a', rate:0.98, pitch:0.95, tags:['播音','新闻','正式'] },
+  { id:'sp',  name:'悄悄话',   emo:'🤫', desc:'轻柔耳语感',                gender:'f', rate:0.88, pitch:1.20, tags:['耳语','轻声','温柔'] },
+];
+
+const F_HINT = ['huihui','yaoyao','xiaoxiao','tingting','meijia','sinji','female','woman','女','婷','慧','瑶','晓'];
+const M_HINT = ['kangkang','yunyang','yunxi','yunye','danny','male','man','男','康','云','峰','浩'];
+
+/* ---- 云端音色（微软 Edge 同款神经网络音色）---- */
+const CLOUD_VOICES = [
+  { g:'🌟 女声 · 推荐', list:[
+    { id:'zh-CN-XiaoxiaoNeural', name:'晓晓', emo:'👩', desc:'温柔知性，最百搭的女声', tags:['女声','温柔','推荐'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaoyiNeural',   name:'晓伊', emo:'👧', desc:'活泼甜美的少女感',       tags:['少女','甜美','活泼'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaochenNeural', name:'晓辰', emo:'🌸', desc:'轻柔温婉，适合讲故事',   tags:['温柔','轻柔'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaohanNeural',  name:'晓涵', emo:'💗', desc:'温暖亲切的大姐姐',       tags:['温暖','亲切'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaomengNeural', name:'晓梦', emo:'🌙', desc:'梦幻柔和',               tags:['柔和','梦幻'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaomoNeural',   name:'晓墨', emo:'📖', desc:'沉静文艺',               tags:['文艺','沉静'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaoqiuNeural',  name:'晓秋', emo:'🍂', desc:'清冷气质',               tags:['清冷','气质'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaoruiNeural',  name:'晓睿', emo:'💼', desc:'干练职场女性',           tags:['干练','职场'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaoxuanNeural', name:'晓萱', emo:'🎀', desc:'明快开朗',               tags:['开朗','明快'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaoyanNeural',  name:'晓颜', emo:'🎓', desc:'稳重端庄',               tags:['端庄','稳重'], pitch:0, rate:0 },
+    { id:'zh-CN-XiaozhenNeural', name:'晓甄', emo:'🪷', desc:'细腻柔和',               tags:['细腻','柔和'], pitch:0, rate:0 },
+  ]},
+  { g:'🎀 萝莉 / 儿童', list:[
+    { id:'zh-CN-XiaoshuangNeural', name:'晓双', emo:'🧸', desc:'★ 纯正小萝莉童声，最适合卖萌', tags:['萝莉','童声','萌'], pitch:0, rate:0, hot:true },
+    { id:'zh-CN-XiaoyouNeural',    name:'晓悠', emo:'🍭', desc:'软糯的小朋友',                 tags:['儿童','软糯'], pitch:0, rate:0 },
+  ]},
+  { g:'🧒 男声 · 正太少年', list:[
+    { id:'zh-CN-YunxiaNeural', name:'云夏', emo:'🧒', desc:'★ 小男孩正太音',   tags:['正太','男孩','童声'], pitch:0, rate:0, hot:true },
+    { id:'zh-CN-YunxiNeural',  name:'云希', emo:'🧑', desc:'★ 阳光少年，活力满满', tags:['少年','阳光','推荐'], pitch:0, rate:0, hot:true },
+    { id:'zh-CN-YunyeNeural',  name:'云野', emo:'📚', desc:'沉稳讲故事的青年', tags:['讲故事','沉稳'], pitch:0, rate:0 },
+  ]},
+  { g:'👨 男声 · 成熟', list:[
+    { id:'zh-CN-YunjianNeural', name:'云健', emo:'🏃', desc:'浑厚有力，解说/运动风', tags:['浑厚','解说'], pitch:0, rate:0 },
+    { id:'zh-CN-YunyangNeural', name:'云扬', emo:'📻', desc:'★ 新闻播报标准男声',     tags:['播音','新闻','正式'], pitch:0, rate:0, hot:true },
+    { id:'zh-CN-YunfengNeural', name:'云枫', emo:'🎙️', desc:'磁性男中音',            tags:['磁性','低沉'], pitch:0, rate:0 },
+    { id:'zh-CN-YunhaoNeural',  name:'云皓', emo:'📢', desc:'洪亮广告腔',            tags:['广告','洪亮'], pitch:0, rate:0 },
+    { id:'zh-CN-YunzeNeural',   name:'云泽', emo:'👴', desc:'年长稳重的长辈',        tags:['长辈','老人'], pitch:0, rate:0 },
+  ]},
+  { g:'🗺️ 方言 / 地区特色', list:[
+    { id:'zh-CN-liaoning-XiaobeiNeural', name:'晓北', emo:'🥟', desc:'东北话小姐姐，贼带劲', tags:['东北话','方言'], pitch:0, rate:0 },
+    { id:'zh-CN-shaanxi-XiaoniNeural',   name:'晓妮', emo:'🍜', desc:'陕西话姑娘',           tags:['陕西话','方言'], pitch:0, rate:0 },
+    { id:'zh-HK-HiuGaaiNeural',  name:'曉佳', emo:'🇭🇰', desc:'粤语女声（香港）',  tags:['粤语','香港'], pitch:0, rate:0 },
+    { id:'zh-HK-HiuMaanNeural',  name:'曉曼', emo:'🇭🇰', desc:'粤语女声 · 温柔',   tags:['粤语','香港'], pitch:0, rate:0 },
+    { id:'zh-HK-WanLungNeural',  name:'雲龍', emo:'🇭🇰', desc:'粤语男声（香港）',  tags:['粤语','香港'], pitch:0, rate:0 },
+    { id:'zh-TW-HsiaoChenNeural',name:'曉臻', emo:'🇹🇼', desc:'台湾腔女声，超嗲',  tags:['台湾腔','嗲'], pitch:0, rate:0 },
+    { id:'zh-TW-HsiaoYuNeural',  name:'曉雨', emo:'🇹🇼', desc:'台湾腔女声 · 活泼', tags:['台湾腔','活泼'], pitch:0, rate:0 },
+    { id:'zh-TW-YunJheNeural',   name:'雲哲', emo:'🇹🇼', desc:'台湾腔男声',        tags:['台湾腔','男声'], pitch:0, rate:0 },
+  ]},
+];
+
+/* 默认音色 */
+const DEF_VOICE = {
+  local: { solo: LOCAL_PRESETS[1], A: LOCAL_PRESETS[0], B: LOCAL_PRESETS[6] },
+  cloud: { solo: CLOUD_VOICES[0].list[0], A: CLOUD_VOICES[1].list[0], B: CLOUD_VOICES[3].list[1] },
+};
+
+/* =======================================================================
+   2. 工具
+   ======================================================================= */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function uuid(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g,'');
+  let d = Date.now().toString(16), s = '';
+  for (let i=0;i<32-d.length;i++) s += Math.floor(Math.random()*16).toString(16);
+  return d + s;
+}
+
+/* 纯 JS SHA-256（file:// 打开时 crypto.subtle 不可用，用它兜底） */
+function sha256js(ascii){
+  const K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+  ];
+  const rotr = (x, n) => (((x >>> n) | (x << (32 - n))) >>> 0);
+
+  // --- 消息填充 ---
+  const bytes = [];
+  for (let i = 0; i < ascii.length; i++) bytes.push(ascii.charCodeAt(i) & 0xff);
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  const hi = Math.floor(bitLen / 4294967296), lo = bitLen >>> 0;
+  bytes.push((hi>>>24)&255,(hi>>>16)&255,(hi>>>8)&255,hi&255,(lo>>>24)&255,(lo>>>16)&255,(lo>>>8)&255,lo&255);
+
+  // --- 主循环 ---
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Array(64);
+  for (let off = 0; off < bytes.length; off += 64){
+    for (let i = 0; i < 16; i++){
+      const b = off + i * 4;
+      w[i] = ((bytes[b]<<24) | (bytes[b+1]<<16) | (bytes[b+2]<<8) | bytes[b+3]) >>> 0;
+    }
+    for (let i = 16; i < 64; i++){
+      const x = w[i-15], y = w[i-2];
+      const s0 = (rotr(x,7) ^ rotr(x,18) ^ (x >>> 3)) >>> 0;
+      const s1 = (rotr(y,17) ^ rotr(y,19) ^ (y >>> 10)) >>> 0;
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+    }
+    let a=H[0], b=H[1], c=H[2], d=H[3], e=H[4], f=H[5], g=H[6], h=H[7];
+    for (let i = 0; i < 64; i++){
+      const S1  = (rotr(e,6) ^ rotr(e,11) ^ rotr(e,25)) >>> 0;
+      const ch  = ((e & f) ^ (~e & g)) >>> 0;
+      const t1  = (h + S1 + ch + K[i] + w[i]) >>> 0;
+      const S0  = (rotr(a,2) ^ rotr(a,13) ^ rotr(a,22)) >>> 0;
+      const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+      const t2  = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H = [(H[0]+a)>>>0,(H[1]+b)>>>0,(H[2]+c)>>>0,(H[3]+d)>>>0,
+         (H[4]+e)>>>0,(H[5]+f)>>>0,(H[6]+g)>>>0,(H[7]+h)>>>0];
+  }
+  return H.map(x => x.toString(16).padStart(8, '0')).join('');
+}
+async function sha256hex(str){
+  try{
+    if (window.crypto && crypto.subtle){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+    }
+  }catch(e){}
+  return sha256js(str).toUpperCase();
+}
+
+/* 分句：让长文本能稳定播放并逐句高亮 */
+function splitText(text){
+  const t = String(text || '').trim();
+  if (!t) return [];
+  const parts = t.split(/(?<=[。！？!?；;…\n\r])/).map(s => s.trim()).filter(Boolean);
+  const out = [];
+  for (const p of parts){
+    if (p.length <= 160){ out.push(p); continue; }
+    let buf = '';
+    for (const ch of p){
+      buf += ch;
+      if (buf.length >= 120 && /[，,、：:]/.test(ch)){ out.push(buf); buf = ''; }
+      else if (buf.length >= 160){ out.push(buf); buf = ''; }
+    }
+    if (buf) out.push(buf);
+  }
+  return out.length ? out : [t];
+}
+
+function setStatus(which, type, html){
+  const box = $('#' + which + 'Status'), txt = $('#' + which + 'StatusTxt');
+  if (!box) return;
+  box.className = 'status show ' + (type || 'info');
+  txt.innerHTML = html;
+}
+function hideStatus(which){
+  const box = $('#' + which + 'Status');
+  if (box) box.className = 'status';
+}
+
+/* =======================================================================
+   3. 本地引擎（Web Speech API）
+   ======================================================================= */
+const Local = {
+  supported(){
+    return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  },
+  loadVoices(){
+    return new Promise(res => {
+      try{
+        let v = speechSynthesis.getVoices();
+        if (v.length) return res(v);
+        speechSynthesis.onvoiceschanged = () => res(speechSynthesis.getVoices());
+        setTimeout(() => res(speechSynthesis.getVoices()), 1200);
+      }catch(e){ res([]); }
+    });
+  },
+  pick(preset, voices){
+    if (!voices.length) return null;
+    const zh = voices.filter(v => /^zh/i.test(v.lang || ''));
+    const pool = zh.length ? zh : voices;
+    const score = v => {
+      const n = (v.name || '').toLowerCase();
+      if (preset.gender === 'f') return F_HINT.some(h => n.includes(h)) ? 2 : (M_HINT.some(h => n.includes(h)) ? 0 : 1);
+      if (preset.gender === 'm') return M_HINT.some(h => n.includes(h)) ? 2 : (F_HINT.some(h => n.includes(h)) ? 0 : 1);
+      return 1;
+    };
+    // 优先本地合成（延迟低），再按匹配分排序
+    return pool.slice().sort((a, b) => {
+      const d = score(b) - score(a);
+      if (d) return d;
+      return (a.localService === b.localService) ? 0 : (a.localService ? -1 : 1);
+    })[0];
+  },
+  speakOne(text, voice, rate, pitch, vol){
+    return new Promise(resolve => {
+      let settled = false;
+      const fin = () => { if (!settled){ settled = true; resolve(); } };
+      const u = new SpeechSynthesisUtterance(text);
+      if (voice) u.voice = voice;
+      u.rate   = Math.min(10, Math.max(0.1, rate));
+      u.pitch  = Math.min(2, Math.max(0, pitch));
+      u.volume = Math.min(1, Math.max(0, vol));
+      u.lang   = (voice && voice.lang) || 'zh-CN';
+      u.onend  = fin;
+      u.onerror = fin;
+      const t = setTimeout(fin, Math.max(8000, text.length * 700));  // 兜底防卡死
+      const orig = fin;
+      u.onend = () => { clearTimeout(t); orig(); };
+      u.onerror = () => { clearTimeout(t); orig(); };
+      speechSynthesis.speak(u);
+    });
+  },
+  stop(){ try{ speechSynthesis.cancel(); }catch(e){} },
+};
+
+/* =======================================================================
+   4. 云端引擎（Edge TTS WebSocket，无需 Key）
+   ======================================================================= */
+const Cloud = {
+  TRUSTED: '6A5AA1D4EAFF4E9FB37E23D68491D6F4',
+  async token(){
+    let ticks = Math.floor(Date.now() / 1000) + 11644473600;
+    ticks -= ticks % 300;
+    const str = (BigInt(ticks) * 10000000n).toString() + this.TRUSTED;
+    return await sha256hex(str);
+  },
+  async url(){
+    const gec = await this.token();
+    return 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1'
+      + '?TrustedClientToken=' + this.TRUSTED
+      + '&Sec-MS-GEC=' + gec
+      + '&Sec-MS-GEC-Version=1-130.0.2849.68'
+      + '&ConnectionId=' + uuid();
+  },
+  /* 合成一段文字，返回 Uint8Array 音频 */
+  synth(text, voiceId, pitchPct, ratePct){
+    return new Promise((resolve, reject) => {
+      let ws, chunks = [], finished = false;
+      const mime = 'audio/mpeg';
+      const timer = setTimeout(() => {
+        if (!finished){ finished = true; try{ ws && ws.close(); }catch(e){} reject(new Error('合成超时，请检查网络或改用本地引擎')); }
+      }, 30000);
+
+      this.url().then(u => {
+        ws = new WebSocket(u);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = () => {
+          const cfg = JSON.stringify({ context: { synthesis: { audio: {
+            metadataoptions: { sentenceBoundaryEnabled: 'false', wordBoundaryEnabled: 'false' },
+            outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+          }}}});
+          ws.send('X-Timestamp:' + new Date().toISOString()
+            + '\r\nContent-Type:application/json; charset=utf-8'
+            + '\r\nPath:speech.config\r\n\r\n' + cfg);
+
+          const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/XMLSchema-instance' xml:lang='zh-CN'>`
+            + `<voice name='${voiceId}'><prosody pitch='${pitchPct}%' rate='${ratePct}%'>`
+            + esc(text)
+            + `</prosody></voice></speak>`;
+          ws.send('X-RequestId:' + uuid()
+            + '\r\nContent-Type:application/ssml+xml'
+            + '\r\nX-Timestamp:' + new Date().toISOString()
+            + '\r\nPath:ssml\r\n\r\n' + ssml);
+        };
+
+        ws.onmessage = ev => {
+          if (typeof ev.data === 'string'){
+            const s = ev.data;
+            if (s.includes('Path:turn.end') || s.includes('Path:turn.complete')){
+              finished = true; clearTimeout(timer);
+              try{ ws.close(); }catch(e){}
+              chunks.length ? resolve({ data: chunks, mime }) : reject(new Error('没有收到音频数据'));
+            } else if (s.includes('Path:error') || s.includes('Invalid')){
+              finished = true; clearTimeout(timer);
+              try{ ws.close(); }catch(e){}
+              reject(new Error('服务器返回错误：' + s.slice(0, 120).replace(/\s+/g, ' ')));
+            }
+            return;
+          }
+          const buf = new Uint8Array(ev.data);
+          if (buf.length < 2) return;
+          let hLen = (buf[0] << 8) | buf[1];
+          if (hLen + 2 > buf.length) hLen = 0;      // 没有 header，整帧都是音频
+          chunks.push(buf.subarray(hLen + 2));
+        };
+
+        ws.onerror = () => {
+          if (!finished){ finished = true; clearTimeout(timer); reject(new Error('无法连接语音服务器（可能被网络/防火墙拦截），请改用本地引擎')); }
+        };
+        ws.onclose = () => {
+          if (!finished){ finished = true; clearTimeout(timer); reject(new Error('连接被中断，请重试或改用本地引擎')); }
+        };
+      }).catch(e => { clearTimeout(timer); reject(e); });
+    });
+  },
+  async probe(){
+    try{
+      const r = await this.synth('测试', 'zh-CN-XiaoxiaoNeural', 0, 0);
+      return !!(r && r.data && r.data.length);
+    }catch(e){ throw e; }
+  },
+  stop(){ const a = $('#player'); try{ a.pause(); a.currentTime = 0; }catch(e){} },
+};
+
+/* =======================================================================
+   5. 播放器：统一的「播一串台词」控制器
+   ======================================================================= */
+const audioEl = () => $('#player');
+
+function waitAudio(el, timeoutMs){
+  return new Promise(resolve => {
+    let done = false;
+    const fin = () => { if (!done){ done = true; cleanup(); resolve(); } };
+    const cleanup = () => {
+      clearTimeout(timer);
+      el.removeEventListener('ended', fin);
+      el.removeEventListener('error', fin);
+      el.removeEventListener('pause', onPause);
+    };
+    const onPause = () => { if (state.pausing) return; fin(); };
+    const timer = setTimeout(fin, timeoutMs || 60000);   // 兜底，防止永远卡住
+    el.addEventListener('ended', fin);
+    el.addEventListener('error', fin);
+    el.addEventListener('pause', onPause);
+  });
+}
+
+/* 把同一句台词被拆开的小片段合并，减少云端请求次数（跨句不合并，保证逐句高亮） */
+function packSegments(segs, maxLen = 380){
+  const out = [];
+  for (const s of segs){
+    const last = out[out.length - 1];
+    if (last && last.onStart === s.onStart && last.voice === s.voice
+        && last.rate === s.rate && last.pitch === s.pitch
+        && (last.text.length + s.text.length) <= maxLen){
+      last.text += s.text;
+      last.onEnd = s.onEnd;
+    } else {
+      out.push({ ...s });
+    }
+  }
+  return out;
+}
+
+async function playSegments(segments, opts = {}){
+  // segments: [{text, voice, rate, pitch, vol, onStart, onEnd}]
+  const ctrl = { aborted: false, paused: false };
+  state.playing = ctrl;
+  state.pausing = false;
+  const allCloudBlobs = [];
+  const segs = state.engine === 'cloud' ? packSegments(segments) : segments;
+
+  let pending = null;   // 预取中的下一句，用于消除句与句之间的停顿
+
+  for (let i = 0; i < segs.length; i++){
+    if (ctrl.aborted) break;
+    const seg = segs[i];
+
+    if (state.engine === 'cloud'){
+      const doSynth = s => Cloud.synth(s.text, s.voice && s.voice.id,
+        Math.round((s.pitch - 1) * 100), Math.round((s.rate - 1) * 100));
+      let r = null;
+      try{
+        if (!pending) pending = doSynth(seg).catch(() => null);
+        r = await pending;
+        pending = null;
+        // 播放当前句的同时，提前把下一句合成好
+        if (i + 1 < segs.length && !ctrl.aborted) pending = doSynth(segs[i + 1]).catch(() => null);
+      }catch(e){
+        pending = null;
+        if (ctrl.aborted) break;
+        opts.onError && opts.onError(e, i);
+        break;
+      }
+      if (ctrl.aborted) break;
+      if (!r){ opts.onError && opts.onError(new Error('这一句合成失败，请稍后重试'), i); break; }
+
+      seg.onStart && seg.onStart();
+      allCloudBlobs.push(...r.data);
+      if (i % 5 === 0 || i === segs.length - 1){        // 边播边攒，随时可下载已合成的部分
+        state.lastAudio = new Blob(allCloudBlobs, { type: r.mime });
+        opts.onAudioReady && opts.onAudioReady(true);
+      }
+      const url = URL.createObjectURL(new Blob(r.data, { type: r.mime }));
+      const el = audioEl();
+      el.src = url;
+      el.volume = Math.min(1, Math.max(0, seg.vol == null ? 1 : seg.vol));
+      let started = false;
+      try{ await el.play(); started = true; }catch(e){ started = false; }
+      if (started) await waitAudio(el, 120000);
+      else await sleep(500);            // 自动播放被拦截时避免卡死
+      URL.revokeObjectURL(url);
+    } else {
+      seg.onStart && seg.onStart();
+      // 本地引擎：把「萝莉音/少女音」这类预设解析成系统里真实存在的音色
+      let sysV = seg.voice && seg.voice.sysVoice;
+      if (!sysV && seg.voice && state.localVoices.length){
+        sysV = Local.pick(seg.voice, state.localVoices);
+        seg.voice.sysVoice = sysV;          // 缓存，避免每次重新排序
+      }
+      await Local.speakOne(seg.text, sysV, seg.rate, seg.pitch, seg.vol == null ? 1 : seg.vol);
+    }
+    seg.onEnd && seg.onEnd();
+  }
+  pending = null;
+
+  if (state.engine === 'cloud' && !allCloudBlobs.length) opts.onAudioReady && opts.onAudioReady(false);
+
+  opts.onFinish && opts.onFinish(ctrl.aborted);
+  state.playing = null;
+  state.pausing = false;
+  return ctrl;
+}
+
+function stopAll(){
+  if (state.playing) state.playing.aborted = true;
+  state.playing = null;
+  state.pausing = false;
+  Local.stop();
+  Cloud.stop();
+  $$('.line.speaking').forEach(e => e.classList.remove('speaking'));
+}
+
+function togglePause(){
+  const p = state.playing;
+  if (!p) return false;
+  if (state.engine === 'cloud'){
+    const el = audioEl();
+    if (el.paused){ state.pausing = false; el.play().catch(()=>{}); return true; }
+    state.pausing = true; el.pause(); return false;
+  } else {
+    if (speechSynthesis.paused){ speechSynthesis.resume(); return true; }
+    speechSynthesis.pause(); return false;
+  }
+}
+
+/* =======================================================================
+   6. 音色选择弹窗
+   ======================================================================= */
+let modalTarget = null;   // 'solo' | 'A' | 'B'
+
+function currentList(){
+  if (state.engine === 'cloud') return CLOUD_VOICES;
+  return [{ g:'🎭 本地引擎预设音色', list: LOCAL_PRESETS.map(p => ({ ...p })) }];
+}
+function allVoicesFlat(){
+  return currentList().flatMap(g => g.list);
+}
+function findVoice(v){
+  if (!v) return null;
+  return allVoicesFlat().find(x => x.id === v.id) || v;
+}
+
+function renderModal(keyword = ''){
+  const kw = keyword.trim().toLowerCase();
+  const box = $('#vgroups');
+  box.innerHTML = '';
+  let total = 0;
+
+  currentList().forEach(group => {
+    const list = group.list.filter(v =>
+      !kw || (v.name + v.desc + (v.tags || []).join('') + group.g).toLowerCase().includes(kw)
+    );
+    if (!list.length) return;
+    total += list.length;
+    const h = document.createElement('div');
+    h.className = 'grp-title';
+    h.textContent = group.g;
+    box.appendChild(h);
+
+    const grid = document.createElement('div');
+    grid.className = 'vgrid';
+    list.forEach(v => {
+      const cur = modalTarget === 'solo' ? state.solo.voice : state[modalTarget].voice;
+      const on = cur && cur.id === v.id;
+      const d = document.createElement('div');
+      d.className = 'vcard' + (on ? ' on' : '');
+      const chips = (v.tags || []).map((t, i) => {
+        const cls = ['g','p','b','y'][i % 4];
+        return `<span class="chip ${cls}">${esc(t)}</span>`;
+      }).join('');
+      d.innerHTML =
+        `<button class="try" title="试听">🔊</button>
+         <div class="top">
+           <div class="emo">${v.emo}</div>
+           <div>
+             <div class="nm">${esc(v.name)}${v.hot ? ' 🔥' : ''}</div>
+             <div class="ds">${esc(v.desc)}</div>
+           </div>
+         </div>
+         <div class="chips">${chips}</div>`;
+      d.querySelector('.try').addEventListener('click', e => { e.stopPropagation(); tryVoice(v); });
+      d.addEventListener('click', () => selectVoice(v));
+      grid.appendChild(d);
+    });
+    box.appendChild(grid);
+  });
+
+  if (!total) box.innerHTML = '<div class="empty"><span class="big">🔍</span>没有匹配的音色，换个关键词试试</div>';
+}
+
+function openModal(target){
+  modalTarget = target;
+  const label = target === 'solo' ? '单人朗读' : (target === 'A' ? $('#roleAName').value : $('#roleBName').value);
+  $('#modalHint').textContent = `（正在为「${label}」选择）`;
+  $('#vsearch').value = '';
+  renderModal('');
+  $('#modal').classList.add('show');
+}
+function closeModal(){ $('#modal').classList.remove('show'); }
+
+function selectVoice(v){
+  if (!modalTarget) return;
+  if (modalTarget === 'solo'){
+    state.solo.voice = v;
+    // 本地预设自带推荐语速音调，顺带套用
+    if (state.engine === 'local' && v.rate){
+      state.solo.rate = v.rate; state.solo.pitch = v.pitch;
+      $('#soloRate').value = v.rate; $('#soloPitch').value = v.pitch;
+      syncKnobs();
+    }
+  } else {
+    state[modalTarget].voice = v;
+    if (state.engine === 'local' && v.rate){
+      state[modalTarget].rate = v.rate; state[modalTarget].pitch = v.pitch;
+      $('#' + modalTarget.toLowerCase() + 'Rate').value = v.rate;
+      $('#' + modalTarget.toLowerCase() + 'Pitch').value = v.pitch;
+      syncKnobs();
+    }
+  }
+  state.mem[state.engine][modalTarget] = state[modalTarget].voice;
+  refreshVoiceLabels();
+  save();
+  closeModal();
+}
+
+async function tryVoice(v){
+  stopAll();
+  const sample = '你好呀，我是' + v.name + '，很高兴认识你～';
+  if (state.engine === 'local'){
+    if (!Local.supported()) return;
+    const sysV = Local.pick(v, state.localVoices);
+    Local.speakOne(sample, sysV, v.rate || 1, v.pitch || 1, 1);
+  } else {
+    try{
+      const r = await Cloud.synth(sample, v.id, 0, 0);
+      const el = audioEl();
+      el.src = URL.createObjectURL(new Blob(r.data, { type: r.mime }));
+      el.play().catch(()=>{});
+    }catch(e){
+      alert('试听失败：' + e.message);
+    }
+  }
+}
+
+/* =======================================================================
+   7. 界面同步
+   ======================================================================= */
+function syncKnobs(){
+  $('#soloRateV').textContent  = (+$('#soloRate').value).toFixed(2) + '×';
+  $('#soloPitchV').textContent = (+$('#soloPitch').value).toFixed(2) + '×';
+  $('#soloVolV').textContent   = Math.round(+$('#soloVol').value * 100) + '%';
+  $('#aRateV').textContent  = (+$('#aRate').value).toFixed(2) + '×';
+  $('#aPitchV').textContent = (+$('#aPitch').value).toFixed(2) + '×';
+  $('#bRateV').textContent  = (+$('#bRate').value).toFixed(2) + '×';
+  $('#bPitchV').textContent = (+$('#bPitch').value).toFixed(2) + '×';
+}
+
+function refreshVoiceLabels(){
+  const s = state.solo.voice, a = state.A.voice, b = state.B.voice;
+  if (s){
+    $('#soloEmo').textContent  = s.emo;
+    $('#soloName').textContent = s.name;
+    $('#soloDesc').textContent = s.desc;
+  }
+  if (a){
+    $('#roleAEmo').textContent = a.emo;
+    $('#roleADesc').textContent = a.name + ' · ' + a.desc;
+  }
+  if (b){
+    $('#roleBEmo').textContent = b.emo;
+    $('#roleBDesc').textContent = b.name + ' · ' + b.desc;
+  }
+  $('#engTag').textContent = state.engine === 'local'
+    ? `本地引擎 · 系统可用音色 ${state.localVoices.filter(v => /^zh/i.test(v.lang||'')).length || state.localVoices.length} 个`
+    : '云端引擎 · 神经网络音色';
+}
+
+function renderLines(){
+  const box = $('#lines');
+  $('#lineCount').textContent = state.lines.length + ' 句';
+  if (!state.lines.length){
+    box.innerHTML = '<div class="empty"><span class="big">💬</span>还没有对话内容<br>在下面输入台词，选择是谁说的，然后点「添加」<br>两个角色会用不同的声音把整段对话演出来</div>';
+    return;
+  }
+  box.innerHTML = state.lines.map((l, i) => {
+    const r = state[l.who];
+    const emo = (r.voice && r.voice.emo) || (l.who === 'A' ? '👧' : '🧑');
+    const nm  = l.who === 'A' ? $('#roleAName').value : $('#roleBName').value;
+    return `<div class="line" data-id="${l.id}">
+      <div class="who">${emo}</div>
+      <div class="body">
+        <div class="n">${esc(nm)} · ${esc((r.voice && r.voice.name) || '未选音色')}</div>
+        <div class="t">${esc(l.text)}</div>
+      </div>
+      <div class="ops">
+        <button class="icb" data-act="play" title="朗读这一句">🔊</button>
+        <button class="icb" data-act="up" title="上移">↑</button>
+        <button class="icb" data-act="down" title="下移">↓</button>
+        <button class="icb del" data-act="del" title="删除">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.line').forEach(el => {
+    const id = el.dataset.id;
+    el.querySelectorAll('.icb').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        const idx = state.lines.findIndex(x => x.id === id);
+        if (idx < 0) return;
+        if (act === 'del'){ state.lines.splice(idx, 1); }
+        else if (act === 'up' && idx > 0){ [state.lines[idx-1], state.lines[idx]] = [state.lines[idx], state.lines[idx-1]]; }
+        else if (act === 'down' && idx < state.lines.length-1){ [state.lines[idx+1], state.lines[idx]] = [state.lines[idx], state.lines[idx+1]]; }
+        else if (act === 'play'){ playLine(idx); return; }
+        renderLines(); save();
+      });
+    });
+  });
+}
+
+/* =======================================================================
+   8. 播放动作
+   ======================================================================= */
+function soloSegments(){
+  const text = $('#soloText').value.trim();
+  if (!text) return [];
+  const v = state.solo.voice;
+  return splitText(text).map(t => ({
+    text: t, voice: v,
+    rate:  state.solo.rate,
+    pitch: state.solo.pitch,
+    vol:   state.solo.vol,
+  }));
+}
+
+$('#soloPlay').addEventListener('click', async () => {
+  const segs = soloSegments();
+  if (!segs.length){ setStatus('solo','err','请先输入要朗读的文字'); return; }
+  if (state.engine === 'local' && !Local.supported()){
+    setStatus('solo','err','你的浏览器不支持本地语音合成，请切换到「云端音色」引擎'); return;
+  }
+  stopAll();
+  $('#soloDownload').disabled = true;
+  state.lastAudio = null;
+  const t0 = Date.now();
+  setStatus('solo','info', state.engine === 'cloud' ? '正在合成语音，请稍候…' : '正在朗读…（共 ' + segs.length + ' 句）');
+
+  await playSegments(segs, {
+    onError: (e) => {
+      setStatus('solo','err', esc(e.message) + '　<a href="javascript:;" id="fallbackLocal" style="color:#ffd79a">⇄ 切回本地引擎</a>');
+      const fb = $('#fallbackLocal');
+      if (fb) fb.onclick = () => setEngine('local');
+    },
+    onAudioReady: ok => { $('#soloDownload').disabled = !ok; },
+    onFinish: (aborted) => {
+      if (aborted) return;
+      setStatus('solo','ok', '朗读完成 ✅　用时 ' + ((Date.now()-t0)/1000).toFixed(1) + ' 秒' +
+        (state.engine === 'cloud' ? '（可点击「下载 MP3」保存）' : ''));
+    }
+  });
+});
+
+$('#soloPause').addEventListener('click', () => {
+  const playing = togglePause();
+  $('#soloPause').textContent = playing ? '⏸️ 暂停' : '▶️ 继续';
+});
+$('#soloStop').addEventListener('click', () => {
+  stopAll(); hideStatus('solo'); $('#soloPause').textContent = '⏸️ 暂停';
+});
+$('#soloClear').addEventListener('click', () => {
+  stopAll(); $('#soloText').value = ''; $('#soloCount').textContent = '0 字'; hideStatus('solo'); save();
+});
+$('#soloDownload').addEventListener('click', () => {
+  if (!state.lastAudio) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(state.lastAudio);
+  a.download = '语音_' + Date.now() + '.mp3';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+
+function playLine(idx){
+  const l = state.lines[idx];
+  if (!l) return;
+  stopAll();
+  const r = state[l.who];
+  $$('.line.speaking').forEach(e => e.classList.remove('speaking'));
+  const el = document.querySelector(`.line[data-id="${l.id}"]`);
+  el && el.classList.add('speaking');
+  playSegments(splitText(l.text).map(t => ({
+    text: t, voice: r.voice, rate: r.rate, pitch: r.pitch, vol: 1
+  })), {
+    onFinish: () => { const e2 = document.querySelector(`.line[data-id="${l.id}"]`); e2 && e2.classList.remove('speaking'); },
+    onError: e => setStatus('chat','err', esc(e.message))
+  });
+}
+
+$('#playAll').addEventListener('click', async () => {
+  if (!state.lines.length){ setStatus('chat','err','先添加几句对话吧'); return; }
+  if (state.engine === 'local' && !Local.supported()){
+    setStatus('chat','err','你的浏览器不支持本地语音合成，请切换到「云端音色」引擎'); return;
+  }
+  stopAll();
+  $('#chatDownload').disabled = true;
+  state.lastAudio = null;
+  setStatus('chat','info', '正在演出整段对话…');
+
+  const segs = [];
+  state.lines.forEach(l => {
+    const r = state[l.who];
+    splitText(l.text).forEach(t => segs.push({
+      text: t, voice: r.voice, rate: r.rate, pitch: r.pitch, vol: 1,
+      onStart: () => {
+        $$('.line.speaking').forEach(e => e.classList.remove('speaking'));
+        const el = document.querySelector(`.line[data-id="${l.id}"]`);
+        if (el){
+          el.classList.add('speaking');
+          try{ el.scrollIntoView({ block:'nearest', behavior:'smooth' }); }catch(e){}
+        }
+      }
+    }));
+  });
+
+  await playSegments(segs, {
+    onError: e => setStatus('chat','err', esc(e.message)),
+    onAudioReady: ok => { $('#chatDownload').disabled = !ok; },
+    onFinish: (aborted) => {
+      $$('.line.speaking').forEach(e => e.classList.remove('speaking'));
+      if (!aborted) setStatus('chat','ok','整段对话播放完成 ✅');
+    }
+  });
+});
+
+$('#chatPause').addEventListener('click', () => {
+  const playing = togglePause();
+  $('#chatPause').textContent = playing ? '⏸️ 暂停' : '▶️ 继续';
+});
+$('#chatStop').addEventListener('click', () => {
+  stopAll(); hideStatus('chat'); $('#chatPause').textContent = '⏸️ 暂停';
+});
+$('#chatDownload').addEventListener('click', () => {
+  if (!state.lastAudio) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(state.lastAudio);
+  a.download = '对话_' + Date.now() + '.mp3';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+$('#exportTxt').addEventListener('click', () => {
+  if (!state.lines.length){ setStatus('chat','err','没有可导出的内容'); return; }
+  const txt = state.lines.map(l =>
+    (l.who === 'A' ? $('#roleAName').value : $('#roleBName').value) + '：' + l.text
+  ).join('\n');
+  const blob = new Blob([txt], { type:'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '对话脚本.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+$('#clearLines').addEventListener('click', () => {
+  if (!state.lines.length) return;
+  if (!confirm('确定清空全部对话吗？')) return;
+  stopAll(); state.lines = []; renderLines(); hideStatus('chat'); save();
+});
+
+/* 添加台词 */
+function addLine(){
+  const t = $('#lineText').value.trim();
+  if (!t){ setStatus('chat','err','请输入台词内容'); return; }
+  state.lines.push({ id: uid(), who: state.who, text: t });
+  $('#lineText').value = '';
+  renderLines(); save();
+  const box = $('#lines'); box.scrollTop = box.scrollHeight;
+}
+$('#addLine').addEventListener('click', addLine);
+$('#lineText').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); addLine(); }
+});
+
+/* =======================================================================
+   9. 事件绑定
+   ======================================================================= */
+$$('.tabs button').forEach(b => b.addEventListener('click', () => {
+  stopAll();
+  $$('.tabs button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  state.tab = b.dataset.tab;
+  $('#tab-solo').style.display = state.tab === 'solo' ? '' : 'none';
+  $('#tab-chat').style.display = state.tab === 'chat' ? '' : 'none';
+  save();
+}));
+
+$$('#engineSwitch button').forEach(b => b.addEventListener('click', () => setEngine(b.dataset.eng)));
+$('#soloVoiceBtn').addEventListener('click', () => openModal('solo'));
+$$('[data-role]').forEach(b => b.addEventListener('click', () => openModal(b.dataset.role)));
+$('#modalClose').addEventListener('click', closeModal);
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+$('#vsearch').addEventListener('input', e => renderModal(e.target.value));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+$('#soloText').addEventListener('input', e => {
+  $('#soloCount').textContent = e.target.value.length + ' 字';
+  save();
+});
+['soloRate','soloPitch','soloVol'].forEach(id => $('#' + id).addEventListener('input', () => {
+  state.solo.rate  = +$('#soloRate').value;
+  state.solo.pitch = +$('#soloPitch').value;
+  state.solo.vol   = +$('#soloVol').value;
+  syncKnobs(); save();
+}));
+[['aRate','A','rate'],['aPitch','A','pitch'],['bRate','B','rate'],['bPitch','B','pitch']]
+.forEach(([id, role, key]) => $('#' + id).addEventListener('input', () => {
+  state[role][key] = +$('#' + id).value;
+  syncKnobs(); save();
+}));
+
+$$('#whoSeg button').forEach(b => b.addEventListener('click', () => {
+  $$('#whoSeg button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  state.who = b.dataset.who;
+}));
+
+$('#soloQuick').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  const ta = $('#soloText');
+  ta.value = (ta.value ? ta.value.replace(/\s*$/,'') + '\n' : '') + e.target.textContent;
+  $('#soloCount').textContent = ta.value.length + ' 字';
+  save();
+});
+
+['roleAName','roleBName'].forEach(id => $('#' + id).addEventListener('input', () => { renderLines(); save(); }));
+
+/* =======================================================================
+   10. 引擎切换
+   ======================================================================= */
+function setEngine(eng, silent){
+  if (state.engine === eng && !silent) return;
+  stopAll();
+  const old = state.engine;
+  ['solo','A','B'].forEach(k => { state.mem[old][k] = state[k].voice; });   // 记住当前引擎下的选择
+  state.engine = eng;
+  ['solo','A','B'].forEach(k => { state[k].voice = state.mem[eng][k] || DEF_VOICE[eng][k]; });
+  $$('#engineSwitch button').forEach(b => b.classList.toggle('on', b.dataset.eng === eng));
+
+  $('#soloDownload').disabled = true;
+  $('#chatDownload').disabled = true;
+
+  if (eng === 'cloud'){
+    setStatus('solo','info','已切换到云端引擎，正在检测连通性…');
+    Cloud.probe().then(() => {
+      state.cloudOK = true;
+      setStatus('solo','ok','云端引擎可用 ✅ 萝莉声推荐「晓双」，正太声推荐「云夏」，播音腔推荐「云扬」');
+    }).catch(e => {
+      state.cloudOK = false;
+      setStatus('solo','err', esc(e.message)
+        + '　<a href="javascript:;" id="fbLocal" style="color:#ffd79a">⇄ 切回本地引擎</a>');
+      const fb = $('#fbLocal');
+      if (fb) fb.onclick = () => setEngine('local');
+    });
+  } else {
+    if (!Local.supported()){
+      setStatus('solo','err','当前浏览器不支持本地语音合成，建议用 Chrome / Edge 打开，或切换到云端引擎');
+    } else {
+      hideStatus('solo');
+    }
+  }
+  refreshVoiceLabels();
+  save();
+}
+
+/* =======================================================================
+   11. 存档
+   ======================================================================= */
+function save(){
+  try{
+    localStorage.setItem(LS, JSON.stringify({
+      engine: state.engine, tab: state.tab,
+      solo: { ...state.solo, voice: state.solo.voice && state.solo.voice.id },
+      A: { ...state.A, voice: state.A.voice && state.A.voice.id },
+      B: { ...state.B, voice: state.B.voice && state.B.voice.id },
+      mem: {
+        local: { solo: state.mem.local.solo && state.mem.local.solo.id,
+                 A: state.mem.local.A && state.mem.local.A.id,
+                 B: state.mem.local.B && state.mem.local.B.id },
+        cloud: { solo: state.mem.cloud.solo && state.mem.cloud.solo.id,
+                 A: state.mem.cloud.A && state.mem.cloud.A.id,
+                 B: state.mem.cloud.B && state.mem.cloud.B.id },
+      },
+      lines: state.lines, who: state.who,
+      text: $('#soloText').value,
+    }));
+  }catch(e){}
+}
+function load(){
+  let d = null;
+  try{ d = JSON.parse(localStorage.getItem(LS) || 'null'); }catch(e){}
+  if (!d) return false;
+  try{
+    if (d.engine === 'local' || d.engine === 'cloud') state.engine = d.engine;
+    const cloudFlat = CLOUD_VOICES.flatMap(g => g.list);
+    const pickL = id => LOCAL_PRESETS.find(v => v.id === id) || null;
+    const pickC = id => cloudFlat.find(v => v.id === id) || null;
+    if (d.mem){
+      state.mem.local = { solo: pickL(d.mem.local && d.mem.local.solo), A: pickL(d.mem.local && d.mem.local.A), B: pickL(d.mem.local && d.mem.local.B) };
+      state.mem.cloud = { solo: pickC(d.mem.cloud && d.mem.cloud.solo), A: pickC(d.mem.cloud && d.mem.cloud.A), B: pickC(d.mem.cloud && d.mem.cloud.B) };
+    }
+    state.solo.voice = state.mem[state.engine].solo || pickL(d.solo && d.solo.voice) || pickC(d.solo && d.solo.voice) || DEF_VOICE[state.engine].solo;
+    state.A.voice    = state.mem[state.engine].A    || pickL(d.A && d.A.voice)       || pickC(d.A && d.A.voice)       || DEF_VOICE[state.engine].A;
+    state.B.voice    = state.mem[state.engine].B    || pickL(d.B && d.B.voice)       || pickC(d.B && d.B.voice)       || DEF_VOICE[state.engine].B;
+    if (d.solo){ state.solo.rate = d.solo.rate ?? 1; state.solo.pitch = d.solo.pitch ?? 1; state.solo.vol = d.solo.vol ?? 1; }
+    if (d.A){ state.A.rate = d.A.rate ?? 1.05; state.A.pitch = d.A.pitch ?? 1.5; }
+    if (d.B){ state.B.rate = d.B.rate ?? 1; state.B.pitch = d.B.pitch ?? 0.9; }
+    if (Array.isArray(d.lines)) state.lines = d.lines;
+    if (d.who) state.who = d.who;
+    if (typeof d.text === 'string') $('#soloText').value = d.text;
+    if (d.tab) state.tab = d.tab;
+    return true;
+  }catch(e){ return false; }
+}
+
+/* =======================================================================
+   12. 初始化
+   ======================================================================= */
+async function init(){
+  ['solo','A','B'].forEach(k => { state[k].voice = DEF_VOICE.local[k]; });
+
+  const restored = load();
+  if (!restored){        // 首次使用：把默认音色的推荐语速/音调一并套上
+    state.solo.rate  = state.solo.voice.rate  ?? 1;  state.solo.pitch = state.solo.voice.pitch ?? 1;
+    state.A.rate     = state.A.voice.rate     ?? 1;  state.A.pitch    = state.A.voice.pitch    ?? 1;
+    state.B.rate     = state.B.voice.rate     ?? 1;  state.B.pitch    = state.B.voice.pitch    ?? 1;
+  }
+
+  // 本地音色列表
+  if (Local.supported()){
+    state.localVoices = await Local.loadVoices();
+    if (!state.localVoices.length){
+      setTimeout(async () => { state.localVoices = await Local.loadVoices(); refreshVoiceLabels(); }, 900);
+    }
+  }
+
+  // 引擎按钮状态
+  $$('#engineSwitch button').forEach(b => b.classList.toggle('on', b.dataset.eng === state.engine));
+  if (!Local.supported() && state.engine === 'local'){
+    setStatus('solo','err','当前浏览器不支持本地语音合成，建议用 Chrome / Edge 打开，或切换到云端引擎');
+  }
+
+  // tab
+  $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === state.tab));
+  $('#tab-solo').style.display = state.tab === 'solo' ? '' : 'none';
+  $('#tab-chat').style.display = state.tab === 'chat' ? '' : 'none';
+
+  // who
+  $$('#whoSeg button').forEach(x => x.classList.toggle('on', x.dataset.who === state.who));
+
+  // 滑块
+  $('#soloRate').value  = state.solo.rate;
+  $('#soloPitch').value = state.solo.pitch;
+  $('#soloVol').value   = state.solo.vol;
+  $('#aRate').value = state.A.rate;  $('#aPitch').value = state.A.pitch;
+  $('#bRate').value = state.B.rate;  $('#bPitch').value = state.B.pitch;
+  syncKnobs();
+
+  $('#soloCount').textContent = $('#soloText').value.length + ' 字';
+  refreshVoiceLabels();
+  renderLines();
+
+  if (!state.lines.length && !restored){
+    state.lines = [
+      { id: uid(), who: 'A', text: '哥哥，你终于来啦！我等你很久了～' },
+      { id: uid(), who: 'B', text: '抱歉抱歉，路上有点堵。等很久了吗？' },
+      { id: uid(), who: 'A', text: '还好啦，因为知道你会来嘛。今天要给我讲什么故事呀？' },
+      { id: uid(), who: 'B', text: '今天讲一个小狐狸找星星的故事，好不好？' },
+      { id: uid(), who: 'A', text: '好耶！我最喜欢听故事了，快开始吧！' },
+    ];
+    renderLines(); save();
+  }
+
+  if (state.engine === 'cloud') setEngine('cloud', true);   // 恢复云端引擎时顺带探测连通性
+
+  // 切走页面时停止播放
+  window.addEventListener('beforeunload', () => { try{ speechSynthesis.cancel(); }catch(e){} });
+}
+
+init();
+</script>
+</body>
+</html>
